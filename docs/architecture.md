@@ -21,7 +21,7 @@ The system is split so the evaluator can be tested without a shell, network conn
 8. The audit ledger chains every entry to the previous SHA-256 hash and can verify historical integrity.
 9. Only an exact, live approval grant can satisfy an approval-required request.
 10. Only then may an adapter receive execution authority.
-11. Execution results will be appended to the same ledger once adapters are introduced.
+11. Execution adapters append forwarding and result events to the same ledger. Phase 3 does this for filesystem I/O.
 
 ## Crate boundaries
 
@@ -36,6 +36,7 @@ Pure authorization logic:
 - canonical fingerprints
 - deterministic evaluator
 - decisions and explanations
+- immutable execution permits minted only from exact ALLOW decisions
 
 It performs no external side effects.
 
@@ -52,9 +53,25 @@ Local audit persistence:
 
 It does not execute tools or decide policy.
 
-### future latch-adapters
+### latch-fs
 
-Filesystem, controlled shell, MCP and GitHub adapters. Each adapter must require an already-authorized execution token rather than evaluating policy itself.
+The first execution adapter:
+
+- canonical configured roots;
+- relative-path normalization with parent traversal rejected;
+- distinct read, write, create and delete operations;
+- leaf-symlink rejection;
+- symlinked-parent escape detection through canonicalization;
+- protected-path enforcement, including protected targets that do not yet exist;
+- revalidation immediately before I/O;
+- exact request/content binding through `ExecutionPermit`;
+- `TOOL_FORWARDED` and `TOOL_RESULT` audit events around actual I/O.
+
+The adapter never evaluates policy. It accepts only an execution permit minted by `latch-core` from an exact `ALLOW` decision.
+
+### future adapters
+
+Controlled shell, MCP and GitHub adapters follow the same rule: normalize first, authorize centrally, then execute only from an immutable permit.
 
 ### desktop
 

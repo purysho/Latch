@@ -25,3 +25,8 @@ Only behavior covered by the current release and regression tests should be trea
 - audit history will be tamper-evident
 
 Every reproduced security flaw should gain a regression test.
+
+
+## Filesystem adapter
+
+Phase 3 treats paths as hostile input. Filesystem requests are root-relative, canonicalized before authorization, revalidated before execution, and rejected on parent traversal, root escape, protected paths, or leaf symlinks. The adapter executes only from an immutable permit minted from an exact ALLOW decision.

@@ -57,6 +57,72 @@ pub struct Decision {
     pub request_fingerprint: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutionPermit {
+    request: ActionRequest,
+    rule_id: Option<String>,
+    request_fingerprint: String,
+}
+
+impl ExecutionPermit {
+    pub fn request(&self) -> &ActionRequest {
+        &self.request
+    }
+
+    pub fn rule_id(&self) -> Option<&str> {
+        self.rule_id.as_deref()
+    }
+
+    pub fn request_fingerprint(&self) -> &str {
+        &self.request_fingerprint
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PermitError {
+    DecisionNotAllowed(Effect),
+    FingerprintMismatch { expected: String, actual: String },
+}
+
+impl std::fmt::Display for PermitError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DecisionNotAllowed(effect) => {
+                write!(formatter, "cannot issue execution permit for {effect:?} decision")
+            }
+            Self::FingerprintMismatch { expected, actual } => write!(
+                formatter,
+                "decision fingerprint does not match request: expected {expected}, got {actual}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for PermitError {}
+
+pub fn issue_execution_permit(
+    request: &ActionRequest,
+    decision: &Decision,
+) -> Result<ExecutionPermit, PermitError> {
+    if decision.effect != Effect::Allow {
+        return Err(PermitError::DecisionNotAllowed(decision.effect));
+    }
+
+    let expected = fingerprint(request);
+    if decision.request_fingerprint != expected {
+        return Err(PermitError::FingerprintMismatch {
+            expected,
+            actual: decision.request_fingerprint.clone(),
+        });
+    }
+
+    Ok(ExecutionPermit {
+        request: request.clone(),
+        rule_id: decision.rule_id.clone(),
+        request_fingerprint: decision.request_fingerprint.clone(),
+    })
+}
+
 pub fn fingerprint(request: &ActionRequest) -> String {
     let canonical = serde_json::to_vec(request).expect("serializing ActionRequest cannot fail");
     let mut hasher = Sha256::new();
@@ -350,6 +416,40 @@ mod tests {
             .effect,
             Effect::Deny
         );
+    }
+
+    #[test]
+    fn execution_permit_requires_allow() {
+        let request = request("repository.write", "purysho/Witness");
+        let decision = evaluate(&session(), &policy(), &request, 1_000);
+
+        assert!(matches!(
+            issue_execution_permit(&request, &decision),
+            Err(PermitError::DecisionNotAllowed(Effect::RequireApproval))
+        ));
+    }
+
+    #[test]
+    fn execution_permit_binds_the_exact_request() {
+        let request = request("repository.read", "purysho/Witness");
+        let decision = evaluate(&session(), &policy(), &request, 1_000);
+        let permit = issue_execution_permit(&request, &decision).expect("allow should mint permit");
+
+        assert_eq!(permit.request(), &request);
+        assert_eq!(permit.rule_id(), Some("read-witness"));
+        assert_eq!(permit.request_fingerprint(), fingerprint(&request));
+    }
+
+    #[test]
+    fn execution_permit_rejects_fingerprint_mismatch() {
+        let request = request("repository.read", "purysho/Witness");
+        let mut decision = evaluate(&session(), &policy(), &request, 1_000);
+        decision.request_fingerprint = "tampered".into();
+
+        assert!(matches!(
+            issue_execution_permit(&request, &decision),
+            Err(PermitError::FingerprintMismatch { .. })
+        ));
     }
 
     #[test]

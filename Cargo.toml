@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/latch-core", "crates/latch-audit"]
+members = ["crates/latch-core", "crates/latch-audit", "crates/latch-fs"]
 resolver = "2"
 
 [workspace.package]
