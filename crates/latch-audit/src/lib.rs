@@ -303,9 +303,8 @@ impl AuditLedger {
     pub fn verify(&self) -> Result<VerificationReport> {
         let entries = self.entries()?;
         let mut previous_hash = GENESIS_HASH.to_string();
-        let mut expected_sequence = 1_i64;
-
         for (index, entry) in entries.iter().enumerate() {
+            let expected_sequence = index as i64 + 1;
             if entry.sequence != expected_sequence {
                 return Ok(VerificationReport {
                     valid: false,
@@ -347,7 +346,6 @@ impl AuditLedger {
             }
 
             previous_hash.clone_from(&entry.entry_hash);
-            expected_sequence += 1;
         }
 
         Ok(VerificationReport {
