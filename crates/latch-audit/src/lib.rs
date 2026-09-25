@@ -224,20 +224,20 @@ impl AuditLedger {
         decision: &Decision,
     ) -> Result<(AuditEntry, AuditEntry)> {
         let expected_fingerprint = fingerprint(request);
-        if decision.request_fingerprint != expected_fingerprint {
+        if decision.request_fingerprint() != expected_fingerprint {
             return Err(AuditError::DecisionFingerprintMismatch {
                 expected: expected_fingerprint,
-                actual: decision.request_fingerprint.clone(),
+                actual: decision.request_fingerprint().to_string(),
             });
         }
 
         let arguments_sha256 = sha256_text(&canonical_json(&request.arguments));
         let request_metadata = serde_json::json!({
-            "request_fingerprint": decision.request_fingerprint,
+            "request_fingerprint": decision.request_fingerprint(),
             "arguments_sha256": arguments_sha256,
         });
         let decision_metadata = serde_json::json!({
-            "request_fingerprint": decision.request_fingerprint,
+            "request_fingerprint": decision.request_fingerprint(),
         });
 
         let transaction = self
@@ -266,15 +266,15 @@ impl AuditLedger {
             &transaction,
             AuditEntryInput {
                 timestamp_unix_ms,
-                event_type: decision_event_type(decision.effect),
+                event_type: decision_event_type(decision.effect()),
                 session_id: Some(session.id.clone()),
                 request_id: Some(request.request_id.clone()),
                 operation: Some(request.operation.clone()),
                 resource_kind: Some(request.resource.kind.clone()),
                 resource_value: Some(request.resource.value.clone()),
-                decision: Some(decision.effect),
-                policy_rule: decision.rule_id.clone(),
-                reason: Some(decision.reason.clone()),
+                decision: Some(decision.effect()),
+                policy_rule: decision.rule_id().map(str::to_string),
+                reason: Some(decision.reason().to_string()),
                 credential_ref: None,
                 metadata: decision_metadata,
             },
@@ -705,13 +705,13 @@ mod tests {
     #[test]
     fn mismatched_decision_fingerprint_is_rejected() -> Result<()> {
         let mut ledger = AuditLedger::in_memory()?;
-        let request = request(json!({"path": "README.md"}));
-        let mut decision = decision(&request);
-        decision.request_fingerprint = "incorrect".into();
+        let original = request(json!({"path": "README.md"}));
+        let decision = decision(&original);
+        let changed = request(json!({"path": "README.md", "extra": true}));
 
         let error = ledger
-            .record_authorization(1_000_000, &session(), &request, &decision)
-            .expect_err("mismatched decision fingerprint must fail closed");
+            .record_authorization(1_000_000, &session(), &changed, &decision)
+            .expect_err("decision for a different request must fail closed");
 
         assert!(matches!(
             error,
