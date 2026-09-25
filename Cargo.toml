@@ -2,6 +2,7 @@
 members = [
   "crates/latch-core",
   "crates/latch-audit",
+  "crates/latch-approvals",
   "crates/latch-fs",
   "crates/latch-shell",
 ]
