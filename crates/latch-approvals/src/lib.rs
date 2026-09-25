@@ -64,7 +64,10 @@ impl fmt::Display for PermitValidationError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Expired { expires_at_unix_ms } => {
-                write!(formatter, "execution permit expired at {expires_at_unix_ms}")
+                write!(
+                    formatter,
+                    "execution permit expired at {expires_at_unix_ms}"
+                )
             }
         }
     }
@@ -91,9 +94,7 @@ impl ApprovalMode {
 pub enum ApprovalResolution {
     Deny,
     AllowOnce,
-    AllowSession {
-        expires_at_unix_ms: Option<i64>,
-    },
+    AllowSession { expires_at_unix_ms: Option<i64> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -442,9 +443,7 @@ impl ApprovalStore {
                 transaction.commit()?;
                 Ok(Some(grant))
             }
-            ApprovalResolution::AllowSession {
-                expires_at_unix_ms,
-            } => {
+            ApprovalResolution::AllowSession { expires_at_unix_ms } => {
                 let grant_expiry = match expires_at_unix_ms {
                     Some(expiry) if expiry <= now_unix_ms => {
                         return Err(ApprovalError::InvalidGrantExpiry(expiry))
@@ -666,8 +665,8 @@ fn validate_session_and_decision(
 }
 
 fn session_expiry_ms(session: &Session) -> Result<i64> {
-    let seconds = i64::try_from(session.expires_at_unix)
-        .map_err(|_| ApprovalError::InvalidSessionExpiry)?;
+    let seconds =
+        i64::try_from(session.expires_at_unix).map_err(|_| ApprovalError::InvalidSessionExpiry)?;
     seconds
         .checked_mul(1_000)
         .ok_or(ApprovalError::InvalidSessionExpiry)
@@ -795,11 +794,7 @@ fn pending_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PendingApproval
         created_at_unix_ms: row.get(9)?,
         expires_at_unix_ms: row.get(10)?,
         status: PendingStatus::from_str(&status).ok_or_else(|| {
-            rusqlite::Error::InvalidColumnType(
-                11,
-                "status".into(),
-                rusqlite::types::Type::Text,
-            )
+            rusqlite::Error::InvalidColumnType(11, "status".into(), rusqlite::types::Type::Text)
         })?,
         resolved_at_unix_ms: row.get(12)?,
         resolution: row.get(13)?,
@@ -864,12 +859,17 @@ fn approval_audit_entry(
 pub enum ApprovalError {
     Database(rusqlite::Error),
     Audit(AuditError),
-    DecisionFingerprintMismatch { expected: String, actual: String },
+    DecisionFingerprintMismatch {
+        expected: String,
+        actual: String,
+    },
     DecisionNotApproval(Effect),
     ApprovalDecisionMissingRule,
     SessionMismatch,
     SessionRevoked,
-    SessionExpired { expires_at_unix_ms: i64 },
+    SessionExpired {
+        expires_at_unix_ms: i64,
+    },
     InvalidSessionExpiry,
     PendingNotFound(String),
     PendingNotOpen {
@@ -927,7 +927,9 @@ impl fmt::Display for ApprovalError {
             }
             Self::InvalidResolver => write!(formatter, "resolver principal cannot be empty"),
             Self::PolicyDenied => write!(formatter, "policy denied the request"),
-            Self::NoMatchingGrant => write!(formatter, "no live approval grant matches the request"),
+            Self::NoMatchingGrant => {
+                write!(formatter, "no live approval grant matches the request")
+            }
         }
     }
 }
@@ -975,7 +977,12 @@ mod tests {
         }
     }
 
-    fn request(id: &str, session_id: &str, value: &str, arguments: serde_json::Value) -> ActionRequest {
+    fn request(
+        id: &str,
+        session_id: &str,
+        value: &str,
+        arguments: serde_json::Value,
+    ) -> ActionRequest {
         ActionRequest {
             request_id: id.into(),
             session_id: session_id.into(),
@@ -1153,8 +1160,8 @@ mod tests {
     }
 
     #[test]
-    fn session_grant_does_not_cross_sessions(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn session_grant_does_not_cross_sessions() -> std::result::Result<(), Box<dyn std::error::Error>>
+    {
         let first_session = session("lat_first");
         let original = request(
             "req_1",
@@ -1193,8 +1200,8 @@ mod tests {
     }
 
     #[test]
-    fn expired_grant_provides_no_authority(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn expired_grant_provides_no_authority() -> std::result::Result<(), Box<dyn std::error::Error>>
+    {
         let session = session("lat_expiry");
         let request = request(
             "req_expiry",
@@ -1371,8 +1378,7 @@ mod tests {
     }
 
     #[test]
-    fn pending_and_grants_survive_reopen(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn pending_and_grants_survive_reopen() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let directory = tempdir()?;
         let path = directory.path().join("approvals.sqlite");
         let session = session("lat_persist");
@@ -1401,7 +1407,9 @@ mod tests {
         };
 
         let store = ApprovalStore::open(&path)?;
-        let pending = store.get_pending(&approval_id)?.expect("persisted approval");
+        let pending = store
+            .get_pending(&approval_id)?
+            .expect("persisted approval");
         assert_eq!(pending.status, PendingStatus::Granted);
         assert_eq!(store.list_active_grants(1_200)?.len(), 1);
         Ok(())
@@ -1445,7 +1453,9 @@ mod tests {
                 thread::spawn(move || {
                     let mut store = ApprovalStore::open(path).expect("open store");
                     barrier.wait();
-                    store.authorize(&session, &request, &decision, 1_200).is_ok()
+                    store
+                        .authorize(&session, &request, &decision, 1_200)
+                        .is_ok()
                 })
             })
             .collect::<Vec<_>>();

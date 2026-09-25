@@ -1,7 +1,7 @@
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use latch_audit::{AuditEntryInput, AuditError, AuditEventType, AuditLedger};
 use latch_approvals::ExecutionPermit;
+use latch_audit::{AuditEntryInput, AuditError, AuditEventType, AuditLedger};
 use latch_core::{ActionRequest, Effect, Resource};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
