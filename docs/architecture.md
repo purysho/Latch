@@ -36,9 +36,25 @@ Pure authorization logic:
 - canonical fingerprints
 - deterministic evaluator
 - decisions and explanations
-- immutable execution permits minted only from exact ALLOW decisions
+- opaque authorization decisions whose fields cannot be fabricated externally
 
 It performs no external side effects.
+
+### latch-approvals
+
+Human approval and execution authority:
+
+- persists pending approval requests and grants in SQLite;
+- accepts only genuine opaque `latch-core::Decision` values;
+- mints non-cloneable execution permits for direct policy ALLOW decisions or validated approval grants;
+- binds allow-once grants to the complete request fingerprint;
+- binds allow-for-session grants to session + policy rule + operation + exact resource + exact arguments, allowing only a fresh request ID;
+- consumes allow-once grants atomically under an immediate SQLite transaction;
+- caps every grant and permit at the underlying session expiry;
+- records approval grants and denials in the audit ledger before approval-store commit;
+- never lets an existing approval override a later policy DENY.
+
+Adapters consume execution permits by value and recheck permit expiry immediately before side effects.
 
 ### latch-audit
 
@@ -67,7 +83,7 @@ The first execution adapter:
 - exact request/content binding through `ExecutionPermit`;
 - `TOOL_FORWARDED` and `TOOL_RESULT` audit events around actual I/O.
 
-The adapter never evaluates policy. It accepts only an execution permit minted by `latch-core` from an exact `ALLOW` decision.
+The adapter never evaluates policy. It accepts only a non-cloneable execution permit minted by `latch-approvals` from a genuine policy ALLOW decision or a matching live approval grant.
 
 ### latch-shell
 
@@ -120,9 +136,13 @@ J. Audit history alteration is detectable.
 
 ## Concurrency rule
 
-Authorization and execution must carry an immutable request ID and canonical fingerprint. A later mutation is a new request and requires a new decision.
+Authorization and execution carry an immutable request ID and canonical fingerprint. A later mutation is a new request and requires a new decision.
 
-Audit appends use an immediate SQLite transaction so chain position and insertion occur under one writer lock.
+Allow-once grants are claimed under an immediate SQLite writer transaction and marked consumed before a permit is returned. Concurrent consumers cannot receive two permits from one grant.
+
+Execution permits are deliberately non-cloneable and adapters consume them by value. This prevents in-process reuse after grant consumption.
+
+Audit appends use an immediate SQLite transaction so chain position and insertion occur under one writer lock. Approval resolution writes its audit event before committing the approval-store transaction; this fails closed if audit persistence is unavailable, though the two SQLite databases are not a distributed atomic transaction.
 
 ## Audit integrity boundary
 

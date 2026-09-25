@@ -75,3 +75,20 @@ Command rules bind:
 - inherited and fixed environment policy.
 
 Environment inheritance is deny-by-default. Captured stdout/stderr is returned to the caller but only its size and digest enter the audit ledger.
+
+
+## Approval replay and races
+
+Phase 5 assumes an agent may replay, mutate, or concurrently submit previously approval-required work.
+
+Controls:
+
+- complete request fingerprint binding for allow-once;
+- session-scope fingerprint retains every material field except request ID;
+- immediate SQLite write transaction for one-shot grant consumption;
+- non-cloneable execution permits consumed by adapters;
+- permit expiry checked at execution;
+- session identity and expiry checked before grant use;
+- current policy DENY takes precedence over grants.
+
+A regression test opens the same persistent approval database from two threads and proves a single allow-once grant yields exactly one successful permit.

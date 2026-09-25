@@ -39,3 +39,14 @@ Phase 4 does not expose arbitrary shell execution. Configured command IDs map to
 Working directories remain inside canonical command-specific roots. Executable content is hashed at rule registration and rechecked before spawn. Environment inheritance is explicit rather than ambient. Process execution has a mandatory timeout and bounded output capture.
 
 Allowing a developer command is still substantial authority. Latch does not claim that an allowed test runner, package manager, compiler, VCS client or language runtime is internally safe; command policy must remain least-privilege.
+
+
+## Approval grants
+
+Human approval is capability issuance, not a bypass around policy.
+
+Allow-once grants are exact-request-bound and atomically consumed. Session grants remain bound to the original operation, resource and arguments and never cross session identity. All grants expire no later than their session.
+
+Execution permits are non-cloneable, consumed by adapters, and validated for expiry immediately before side effects. Current policy is evaluated before grants, so a newly introduced DENY overrides previously approved authority.
+
+Approval resolution is audit-first: Latch will not commit a grant if its approval audit event cannot be appended.
