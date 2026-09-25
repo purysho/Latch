@@ -477,8 +477,8 @@ impl FilesystemAdapter {
         let parent = path
             .parent()
             .ok_or_else(|| FsError::InvalidRelativePath(path.to_path_buf()))?;
-        let canonical_parent = fs::canonicalize(parent)
-            .map_err(|error| map_not_found(error, parent.to_path_buf()))?;
+        let canonical_parent =
+            fs::canonicalize(parent).map_err(|error| map_not_found(error, parent.to_path_buf()))?;
         self.ensure_within_roots(&canonical_parent)?;
         self.ensure_not_protected(&canonical_parent)?;
 
@@ -906,8 +906,7 @@ mod tests {
         let protected = root.join("protected.txt");
         fs::write(&protected, b"secret")?;
 
-        let adapter =
-            FilesystemAdapter::new(vec![root.clone()], vec![protected.clone()])?;
+        let adapter = FilesystemAdapter::new(vec![root.clone()], vec![protected.clone()])?;
         let canonical = fs::canonicalize(&protected)?;
         let request = ActionRequest {
             request_id: "req-protected".into(),
