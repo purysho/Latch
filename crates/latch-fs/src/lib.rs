@@ -861,14 +861,14 @@ mod tests {
         let create_permit = permit_for(&create, FsOperation::Create, &root);
         let mut ledger = AuditLedger::in_memory()?;
         assert_eq!(
-            adapter.execute(&create_permit, &mut ledger, 1_000_001)?,
+            adapter.execute(create_permit, &mut ledger, 1_000_001)?,
             FsOutcome::Created { bytes: 3 }
         );
 
         let delete = adapter.prepare_delete(&root, "req-delete", "lat_fs", Path::new("new.txt"))?;
         let delete_permit = permit_for(&delete, FsOperation::Delete, &root);
         assert_eq!(
-            adapter.execute(&delete_permit, &mut ledger, 1_000_002)?,
+            adapter.execute(delete_permit, &mut ledger, 1_000_002)?,
             FsOutcome::Deleted
         );
         assert!(!root.join("new.txt").exists());
@@ -933,7 +933,7 @@ mod tests {
         let mut ledger = AuditLedger::in_memory()?;
 
         let error = adapter
-            .execute(&permit, &mut ledger, 1_000_001)
+            .execute(permit, &mut ledger, 1_000_001)
             .expect_err("adapter must enforce protected paths defensively");
         assert!(matches!(error, FsError::ProtectedPath(_)));
         Ok(())
@@ -959,7 +959,7 @@ mod tests {
 
         let mut ledger = AuditLedger::in_memory()?;
         let error = adapter
-            .execute(&permit, &mut ledger, 1_000_001)
+            .execute(permit, &mut ledger, 1_000_001)
             .expect_err("changed target must fail closed");
 
         assert!(matches!(
