@@ -1,0 +1,1 @@
+fn main() { latch_desktop_lib::run(); }
