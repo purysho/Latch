@@ -1,7 +1,8 @@
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use latch_audit::{AuditEntryInput, AuditError, AuditEventType, AuditLedger};
-use latch_core::{ActionRequest, Effect, ExecutionPermit, Resource};
+use latch_approvals::ExecutionPermit;
+use latch_core::{ActionRequest, Effect, Resource};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::fmt;
@@ -332,10 +333,13 @@ impl FilesystemAdapter {
 
     pub fn execute(
         &self,
-        permit: &ExecutionPermit,
+        permit: ExecutionPermit,
         ledger: &mut AuditLedger,
         timestamp_unix_ms: i64,
     ) -> Result<FsOutcome> {
+        permit
+            .validate_at(timestamp_unix_ms)
+            .map_err(|error| FsError::InvalidPermit(error.to_string()))?;
         let request = permit.request();
         if request.resource.kind != RESOURCE_KIND {
             return Err(FsError::InvalidPermit(format!(
@@ -356,35 +360,35 @@ impl FilesystemAdapter {
             FsOperation::Read => {
                 let current = self.revalidate_existing(&authorized_path)?;
                 self.ensure_same_path(&authorized_path, &current)?;
-                self.audit_forwarded(permit, ledger, timestamp_unix_ms)?;
+                self.audit_forwarded(&permit, ledger, timestamp_unix_ms)?;
                 let outcome = self.read_file(&current);
-                self.audit_result(permit, ledger, timestamp_unix_ms, &outcome)?;
+                self.audit_result(&permit, ledger, timestamp_unix_ms, &outcome)?;
                 outcome
             }
             FsOperation::Write => {
                 let current = self.revalidate_existing(&authorized_path)?;
                 self.ensure_same_path(&authorized_path, &current)?;
                 let contents = decode_contents(&request.arguments)?;
-                self.audit_forwarded(permit, ledger, timestamp_unix_ms)?;
+                self.audit_forwarded(&permit, ledger, timestamp_unix_ms)?;
                 let outcome = self.write_file(&current, &contents);
-                self.audit_result(permit, ledger, timestamp_unix_ms, &outcome)?;
+                self.audit_result(&permit, ledger, timestamp_unix_ms, &outcome)?;
                 outcome
             }
             FsOperation::Create => {
                 let current = self.revalidate_create(&authorized_path)?;
                 self.ensure_same_path(&authorized_path, &current)?;
                 let contents = decode_contents(&request.arguments)?;
-                self.audit_forwarded(permit, ledger, timestamp_unix_ms)?;
+                self.audit_forwarded(&permit, ledger, timestamp_unix_ms)?;
                 let outcome = self.create_file(&current, &contents);
-                self.audit_result(permit, ledger, timestamp_unix_ms, &outcome)?;
+                self.audit_result(&permit, ledger, timestamp_unix_ms, &outcome)?;
                 outcome
             }
             FsOperation::Delete => {
                 let current = self.revalidate_existing(&authorized_path)?;
                 self.ensure_same_path(&authorized_path, &current)?;
-                self.audit_forwarded(permit, ledger, timestamp_unix_ms)?;
+                self.audit_forwarded(&permit, ledger, timestamp_unix_ms)?;
                 let outcome = self.delete_file(&current);
-                self.audit_result(permit, ledger, timestamp_unix_ms, &outcome)?;
+                self.audit_result(&permit, ledger, timestamp_unix_ms, &outcome)?;
                 outcome
             }
         }
@@ -739,7 +743,8 @@ fn map_not_found(error: std::io::Error, path: PathBuf) -> FsError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use latch_core::{evaluate, issue_execution_permit, Decision, Policy, Rule, Session};
+    use latch_approvals::ApprovalStore;
+    use latch_core::{evaluate, Decision, Policy, Rule, Session};
     use tempfile::tempdir;
 
     fn session() -> Session {
@@ -767,8 +772,12 @@ mod tests {
     }
 
     fn permit_for(request: &ActionRequest, operation: FsOperation, root: &Path) -> ExecutionPermit {
-        let decision = evaluate(&session(), &allow_policy(root, operation), request, 1_000);
-        issue_execution_permit(request, &decision).expect("allow decision should issue permit")
+        let session = session();
+        let decision = evaluate(&session, &allow_policy(root, operation), request, 1_000);
+        let mut approvals = ApprovalStore::in_memory().expect("approval store");
+        approvals
+            .authorize(&session, request, &decision, 1_000_000)
+            .expect("allow decision should issue permit")
     }
 
     fn record_decision(
@@ -796,10 +805,11 @@ mod tests {
         let request = adapter.prepare_read(&root, "req-read", "lat_fs", Path::new("notes.txt"))?;
         let mut ledger = AuditLedger::in_memory()?;
         let decision = record_decision(&mut ledger, &request, FsOperation::Read, &root);
-        let permit = issue_execution_permit(&request, &decision)?;
+        let mut approvals = ApprovalStore::in_memory()?;
+        let permit = approvals.authorize(&session(), &request, &decision, 1_000_000)?;
 
         assert_eq!(
-            adapter.execute(&permit, &mut ledger, 1_000_001)?,
+            adapter.execute(permit, &mut ledger, 1_000_001)?,
             FsOutcome::Read(b"hello".to_vec())
         );
 
@@ -831,7 +841,7 @@ mod tests {
         let mut ledger = AuditLedger::in_memory()?;
 
         assert_eq!(
-            adapter.execute(&permit, &mut ledger, 1_000_001)?,
+            adapter.execute(permit, &mut ledger, 1_000_001)?,
             FsOutcome::Written { bytes: 5 }
         );
         assert_eq!(fs::read(root.join("notes.txt"))?, b"after");
@@ -977,7 +987,7 @@ mod tests {
         let permit = permit_for(&request, FsOperation::Write, &root);
         let mut ledger = AuditLedger::in_memory()?;
 
-        adapter.execute(&permit, &mut ledger, 1_000_001)?;
+        adapter.execute(permit, &mut ledger, 1_000_001)?;
         let audit = ledger
             .entries()?
             .into_iter()
