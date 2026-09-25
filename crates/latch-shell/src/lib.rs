@@ -1142,7 +1142,7 @@ mod tests {
 
         let mut ledger = AuditLedger::in_memory()?;
         let error = adapter
-            .execute(&permit, &mut ledger, 1_000_001)
+            .execute(permit, &mut ledger, 1_000_001)
             .expect_err("modified executable should fail closed");
 
         assert!(matches!(error, ShellError::ExecutableChanged(_)));
