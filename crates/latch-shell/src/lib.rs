@@ -1,5 +1,6 @@
 use latch_audit::{AuditEntryInput, AuditError, AuditEventType, AuditLedger};
-use latch_core::{ActionRequest, Effect, ExecutionPermit, Resource};
+use latch_approvals::ExecutionPermit;
+use latch_core::{ActionRequest, Effect, Resource};
 use processkit::{Command as ProcessCommand, OutputBufferPolicy};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -330,10 +331,13 @@ impl ShellAdapter {
 
     pub fn execute(
         &self,
-        permit: &ExecutionPermit,
+        permit: ExecutionPermit,
         ledger: &mut AuditLedger,
         timestamp_unix_ms: i64,
     ) -> Result<ShellOutcome> {
+        permit
+            .validate_at(timestamp_unix_ms)
+            .map_err(|error| ShellError::InvalidPermit(error.to_string()))?;
         let request = permit.request();
         if request.operation != OPERATION || request.resource.kind != RESOURCE_KIND {
             return Err(ShellError::InvalidPermit(
@@ -432,7 +436,7 @@ impl ShellAdapter {
         }
 
         ledger.append(audit_entry(
-            permit,
+            &permit,
             timestamp_unix_ms,
             AuditEventType::ToolForwarded,
             json!({
@@ -447,7 +451,7 @@ impl ShellAdapter {
         match process_result {
             Ok(outcome) => {
                 ledger.append(audit_result_entry(
-                    permit,
+                    &permit,
                     timestamp_unix_ms,
                     command_id,
                     &outcome,
@@ -456,7 +460,7 @@ impl ShellAdapter {
             }
             Err(error) => {
                 ledger.append(audit_entry(
-                    permit,
+                    &permit,
                     timestamp_unix_ms,
                     AuditEventType::ToolResult,
                     json!({
@@ -922,7 +926,8 @@ fn hash_path(hasher: &mut Sha256, path: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use latch_core::{evaluate, issue_execution_permit, Policy, Rule, Session};
+    use latch_approvals::ApprovalStore;
+    use latch_core::{evaluate, Policy, Rule, Session};
     use std::io::Write;
     use std::thread;
     use tempfile::tempdir;
@@ -975,13 +980,17 @@ mod tests {
         command_id: &str,
         root: &Path,
     ) -> ExecutionPermit {
+        let session = session();
         let decision = evaluate(
-            &session(),
+            &session,
             &allow_policy(adapter, command_id, root),
             request,
             1_000,
         );
-        issue_execution_permit(request, &decision).expect("allowed shell request")
+        let mut approvals = ApprovalStore::in_memory().expect("approval store");
+        approvals
+            .authorize(&session, request, &decision, 1_000_000)
+            .expect("allowed shell request")
     }
 
     #[test]
@@ -1076,12 +1085,14 @@ mod tests {
         )?;
 
         let policy = allow_policy(&adapter, "developer-test", root);
-        let decision = evaluate(&session(), &policy, &request, 1_000);
-        let permit = issue_execution_permit(&request, &decision)?;
+        let session = session();
+        let decision = evaluate(&session, &policy, &request, 1_000);
+        let mut approvals = ApprovalStore::in_memory()?;
+        let permit = approvals.authorize(&session, &request, &decision, 1_000_000)?;
         let mut ledger = AuditLedger::in_memory()?;
-        ledger.record_authorization(1_000_000, &session(), &request, &decision)?;
+        ledger.record_authorization(1_000_000, &session, &request, &decision)?;
 
-        let outcome = adapter.execute(&permit, &mut ledger, 1_000_001)?;
+        let outcome = adapter.execute(permit, &mut ledger, 1_000_001)?;
 
         assert_eq!(outcome.exit_code, Some(0));
         assert!(!outcome.timed_out);
@@ -1174,7 +1185,7 @@ mod tests {
         let permit = permit_for(&adapter, &request, "slow-test", root);
         let mut ledger = AuditLedger::in_memory()?;
 
-        let outcome = adapter.execute(&permit, &mut ledger, 1_000_001)?;
+        let outcome = adapter.execute(permit, &mut ledger, 1_000_001)?;
 
         assert!(outcome.timed_out);
         assert_eq!(outcome.exit_code, None);
