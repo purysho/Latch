@@ -420,9 +420,7 @@ impl ShellAdapter {
             .iter()
             .any(|root| current_working_dir.starts_with(root))
         {
-            return Err(ShellError::WorkingDirectoryOutsideRoot(
-                current_working_dir,
-            ));
+            return Err(ShellError::WorkingDirectoryOutsideRoot(current_working_dir));
         }
 
         let current_executable = fs::canonicalize(&rule.executable)
@@ -483,9 +481,7 @@ impl ShellAdapter {
             .current_dir(working_dir)
             .env_clear()
             .timeout(rule.timeout)
-            .output_buffer(
-                OutputBufferPolicy::unbounded().with_max_bytes(rule.max_output_bytes),
-            );
+            .output_buffer(OutputBufferPolicy::unbounded().with_max_bytes(rule.max_output_bytes));
 
         for argument in arguments {
             command = command.arg(argument);
@@ -605,14 +601,23 @@ impl fmt::Display for ShellError {
             Self::DuplicateCommand(id) => write!(formatter, "duplicate command rule: {id}"),
             Self::InvalidCommandId(id) => write!(formatter, "invalid command id: {id}"),
             Self::ForbiddenInterpreter(name) => {
-                write!(formatter, "V1 does not permit registering command shell {name}")
+                write!(
+                    formatter,
+                    "V1 does not permit registering command shell {name}"
+                )
             }
             Self::CommandNotAllowed(id) => write!(formatter, "command is not allowed: {id}"),
             Self::ArgumentsNotAllowed { command_id } => {
-                write!(formatter, "arguments are not allowed for command {command_id}")
+                write!(
+                    formatter,
+                    "arguments are not allowed for command {command_id}"
+                )
             }
             Self::CommandRuleChanged(command_id) => {
-                write!(formatter, "command rule changed after authorization: {command_id}")
+                write!(
+                    formatter,
+                    "command rule changed after authorization: {command_id}"
+                )
             }
             Self::WorkingRootNotAllowed(path) => {
                 write!(formatter, "working root is not allowed: {}", path.display())
@@ -806,9 +811,9 @@ fn audit_result_entry(
 
 fn validate_command_id(id: &str) -> Result<()> {
     if id.is_empty()
-        || !id
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.'))
+        || !id.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
+        })
     {
         return Err(ShellError::InvalidCommandId(id.to_string()));
     }
@@ -818,8 +823,7 @@ fn validate_command_id(id: &str) -> Result<()> {
 fn forbidden_shell_name(name: &str) -> bool {
     matches!(
         name.to_ascii_lowercase().as_str(),
-        "sh"
-            | "sh.exe"
+        "sh" | "sh.exe"
             | "bash"
             | "bash.exe"
             | "dash"
@@ -1142,8 +1146,8 @@ mod tests {
     }
 
     #[test]
-    fn timeout_terminates_controlled_process(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn timeout_terminates_controlled_process() -> std::result::Result<(), Box<dyn std::error::Error>>
+    {
         let directory = tempdir()?;
         let root = directory.path();
         let args = vec![
@@ -1201,10 +1205,7 @@ mod tests {
             )
             .expect_err("working directory traversal should fail");
 
-        assert!(matches!(
-            error,
-            ShellError::InvalidRelativeWorkingDir(_)
-        ));
+        assert!(matches!(error, ShellError::InvalidRelativeWorkingDir(_)));
         Ok(())
     }
 }
