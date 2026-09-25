@@ -21,7 +21,7 @@ The system is split so the evaluator can be tested without a shell, network conn
 8. The audit ledger chains every entry to the previous SHA-256 hash and can verify historical integrity.
 9. Only an exact, live approval grant can satisfy an approval-required request.
 10. Only then may an adapter receive execution authority.
-11. Execution adapters append forwarding and result events to the same ledger. Phase 3 does this for filesystem I/O.
+11. Execution adapters append forwarding and result events to the same ledger. Filesystem and controlled-process execution both use this boundary.
 
 ## Crate boundaries
 
@@ -69,9 +69,28 @@ The first execution adapter:
 
 The adapter never evaluates policy. It accepts only an execution permit minted by `latch-core` from an exact `ALLOW` decision.
 
+### latch-shell
+
+Controlled process execution:
+
+- trusted command IDs map to canonical executable paths;
+- executable SHA-256 is bound into the command rule;
+- command-rule fingerprints bind executable identity, argument policy, working roots, timeout, output cap and environment policy;
+- input command lines are parsed structurally;
+- compound expressions and shell operators are rejected;
+- V1 refuses registration of command shells such as cmd, PowerShell, sh, bash, zsh, fish and WSL;
+- working directories are canonicalized and restricted to command-specific roots;
+- environment inheritance is empty unless explicitly allowlisted;
+- stdin is closed by the process runner;
+- timeouts tear down the contained process tree;
+- stdout/stderr are captured with a configured memory ceiling;
+- audit records hashes and sizes of process output rather than copying captured output into the ledger.
+
+The adapter does not claim to sandbox an allowed developer command. A permitted pytest, npm, cargo, git or language-runtime command can still perform whatever that executable and project configuration allow.
+
 ### future adapters
 
-Controlled shell, MCP and GitHub adapters follow the same rule: normalize first, authorize centrally, then execute only from an immutable permit.
+MCP and GitHub adapters follow the same rule: normalize first, authorize centrally, then execute only from an immutable permit.
 
 ### desktop
 

@@ -8,7 +8,7 @@ Latch is a local-first security broker for AI agents. It sits between an agent a
 
 ## Status
 
-Latch is in active development. Phases 0–3 now establish the security architecture, deterministic authorization core, tamper-evident audit ledger, and the first execution boundary: a scoped filesystem adapter with canonical-path enforcement and audit-integrated I/O.
+Latch is in active development. Phases 0–4 establish the security architecture, deterministic authorization core, tamper-evident audit ledger, scoped filesystem I/O, and a permit-gated controlled process runner that never invokes an implicit OS shell.
 
 ## Principles
 
@@ -61,6 +61,7 @@ crates/
   latch-core/       typed request, policy, resource and decision model
   latch-audit/      immutable SQLite event ledger + hash-chain verification
   latch-fs/         canonical, permit-gated filesystem adapter
+  latch-shell/      structured, allowlisted controlled process execution
 apps/
   desktop/          Tauri + React local control-plane UI
 docs/
@@ -87,7 +88,7 @@ The desktop app follows the visual language of the Purysho desktop tools while u
 2. Authorization core — complete
 3. Audit ledger — complete
 4. Filesystem adapter — complete
-5. Controlled shell
+5. Controlled shell — complete
 6. Approval system
 7. MCP proxy
 8. Secret broker

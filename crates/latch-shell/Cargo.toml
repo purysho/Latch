@@ -1,0 +1,17 @@
+[package]
+name = "latch-shell"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+hex = "0.4"
+latch-audit = { path = "../latch-audit" }
+latch-core = { path = "../latch-core" }
+processkit = "3.3.4"
+serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "process", "io-util"] }
+
+[dev-dependencies]
+tempfile = "3"

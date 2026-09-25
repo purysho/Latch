@@ -45,7 +45,7 @@ Approvals must bind to an exact canonical request fingerprint and explicit lifet
 1. Prompt injection inducing credential or filesystem access.
 2. Scope escalation from a permitted resource to a sibling or broader resource.
 3. Path traversal and symlink/junction escape.
-4. Shell metacharacters, chaining and secondary interpreter escape.
+4. Shell metacharacters, chaining, command-shell registration and secondary interpreter escape.
 5. Tool-name spoofing or MCP schema drift.
 6. Approval replay after any material request field changes.
 7. Stale or expired sessions / grants.
@@ -58,3 +58,20 @@ Approvals must bind to an exact canonical request fingerprint and explicit lifet
 ## Required negative tests
 
 Every threat above must gain a regression test before the corresponding adapter is considered production-capable.
+
+
+## Controlled process boundary
+
+Phase 4 treats a requested command line as untrusted data. Latch parses it without invoking a shell, rejects compound operators, resolves only trusted command IDs, and launches a configured canonical executable directly.
+
+Command policy is trusted configuration. Allowing a command is meaningful authority: tests, build tools and package managers may execute project code, plugins or child processes. Phase 4 prevents an agent from broadening that authority through implicit shell syntax; it is not a general code sandbox or network firewall.
+
+Command rules bind:
+- canonical executable path and SHA-256;
+- accepted argument shapes;
+- canonical working roots;
+- timeout;
+- output-capture ceiling;
+- inherited and fixed environment policy.
+
+Environment inheritance is deny-by-default. Captured stdout/stderr is returned to the caller but only its size and digest enter the audit ledger.
