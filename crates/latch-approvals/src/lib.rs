@@ -44,10 +44,7 @@ impl ExecutionPermit {
         self.expires_at_unix_ms
     }
 
-    pub fn validate_at(
-        &self,
-        now_unix_ms: i64,
-    ) -> std::result::Result<(), PermitValidationError> {
+    pub fn validate_at(&self, now_unix_ms: i64) -> std::result::Result<(), PermitValidationError> {
         if now_unix_ms >= self.expires_at_unix_ms {
             Err(PermitValidationError::Expired {
                 expires_at_unix_ms: self.expires_at_unix_ms,
