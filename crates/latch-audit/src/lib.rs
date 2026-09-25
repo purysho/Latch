@@ -5,8 +5,7 @@ use sha2::{Digest, Sha256};
 use std::fmt;
 use std::path::Path;
 
-const GENESIS_HASH: &str =
-    "0000000000000000000000000000000000000000000000000000000000000000";
+const GENESIS_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuditEventType {
