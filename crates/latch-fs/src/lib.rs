@@ -97,7 +97,11 @@ impl fmt::Display for FsError {
         match self {
             Self::NoRoots => write!(formatter, "filesystem adapter requires at least one root"),
             Self::RootNotAllowed(path) => {
-                write!(formatter, "filesystem root is not configured: {}", path.display())
+                write!(
+                    formatter,
+                    "filesystem root is not configured: {}",
+                    path.display()
+                )
             }
             Self::InvalidRelativePath(path) => write!(
                 formatter,
@@ -105,25 +109,53 @@ impl fmt::Display for FsError {
                 path.display()
             ),
             Self::NonUtf8Path(path) => {
-                write!(formatter, "filesystem path is not valid UTF-8: {}", path.display())
+                write!(
+                    formatter,
+                    "filesystem path is not valid UTF-8: {}",
+                    path.display()
+                )
             }
             Self::PathOutsideRoot(path) => {
-                write!(formatter, "filesystem target escapes configured root: {}", path.display())
+                write!(
+                    formatter,
+                    "filesystem target escapes configured root: {}",
+                    path.display()
+                )
             }
             Self::ProtectedPath(path) => {
-                write!(formatter, "filesystem target is protected: {}", path.display())
+                write!(
+                    formatter,
+                    "filesystem target is protected: {}",
+                    path.display()
+                )
             }
             Self::LeafSymlink(path) => {
-                write!(formatter, "filesystem leaf symlink is not executable: {}", path.display())
+                write!(
+                    formatter,
+                    "filesystem leaf symlink is not executable: {}",
+                    path.display()
+                )
             }
             Self::TargetNotFound(path) => {
-                write!(formatter, "filesystem target does not exist: {}", path.display())
+                write!(
+                    formatter,
+                    "filesystem target does not exist: {}",
+                    path.display()
+                )
             }
             Self::TargetAlreadyExists(path) => {
-                write!(formatter, "filesystem create target already exists: {}", path.display())
+                write!(
+                    formatter,
+                    "filesystem create target already exists: {}",
+                    path.display()
+                )
             }
             Self::TargetNotFile(path) => {
-                write!(formatter, "filesystem target is not a regular file: {}", path.display())
+                write!(
+                    formatter,
+                    "filesystem target is not a regular file: {}",
+                    path.display()
+                )
             }
             Self::InvalidPermit(reason) => write!(formatter, "invalid filesystem permit: {reason}"),
             Self::InvalidArguments(reason) => {
@@ -278,8 +310,8 @@ impl FilesystemAdapter {
         let parent = candidate
             .parent()
             .ok_or_else(|| FsError::InvalidRelativePath(relative_path.to_path_buf()))?;
-        let canonical_parent = fs::canonicalize(parent)
-            .map_err(|error| map_not_found(error, parent.to_path_buf()))?;
+        let canonical_parent =
+            fs::canonicalize(parent).map_err(|error| map_not_found(error, parent.to_path_buf()))?;
         self.ensure_within_roots(&canonical_parent)?;
 
         let filename = candidate
@@ -476,10 +508,7 @@ impl FilesystemAdapter {
     }
 
     fn create_file(&self, path: &Path, contents: &[u8]) -> Result<FsOutcome> {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(path)?;
+        let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
         file.write_all(contents)?;
         file.sync_all()?;
         Ok(FsOutcome::Created {
@@ -710,9 +739,7 @@ fn map_not_found(error: std::io::Error, path: PathBuf) -> FsError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use latch_core::{
-        evaluate, issue_execution_permit, Decision, Policy, Rule, Session,
-    };
+    use latch_core::{evaluate, issue_execution_permit, Decision, Policy, Rule, Session};
     use tempfile::tempdir;
 
     fn session() -> Session {
@@ -738,11 +765,7 @@ mod tests {
         }
     }
 
-    fn permit_for(
-        request: &ActionRequest,
-        operation: FsOperation,
-        root: &Path,
-    ) -> ExecutionPermit {
+    fn permit_for(request: &ActionRequest, operation: FsOperation, root: &Path) -> ExecutionPermit {
         let decision = evaluate(&session(), &allow_policy(root, operation), request, 1_000);
         issue_execution_permit(request, &decision).expect("allow decision should issue permit")
     }
@@ -761,8 +784,8 @@ mod tests {
     }
 
     #[test]
-    fn read_executes_only_from_an_allow_permit() -> std::result::Result<(), Box<dyn std::error::Error>>
-    {
+    fn read_executes_only_from_an_allow_permit(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         let directory = tempdir()?;
         let root = directory.path().join("workspace");
         fs::create_dir(&root)?;
@@ -796,8 +819,13 @@ mod tests {
         fs::write(root.join("notes.txt"), b"before")?;
 
         let adapter = FilesystemAdapter::new(vec![root.clone()], Vec::new())?;
-        let request =
-            adapter.prepare_write(&root, "req-write", "lat_fs", Path::new("notes.txt"), b"after")?;
+        let request = adapter.prepare_write(
+            &root,
+            "req-write",
+            "lat_fs",
+            Path::new("notes.txt"),
+            b"after",
+        )?;
         let permit = permit_for(&request, FsOperation::Write, &root);
         let mut ledger = AuditLedger::in_memory()?;
 
@@ -826,8 +854,7 @@ mod tests {
             FsOutcome::Created { bytes: 3 }
         );
 
-        let delete =
-            adapter.prepare_delete(&root, "req-delete", "lat_fs", Path::new("new.txt"))?;
+        let delete = adapter.prepare_delete(&root, "req-delete", "lat_fs", Path::new("new.txt"))?;
         let delete_permit = permit_for(&delete, FsOperation::Delete, &root);
         assert_eq!(
             adapter.execute(&delete_permit, &mut ledger, 1_000_002)?,
@@ -860,8 +887,7 @@ mod tests {
         let root = directory.path().join("workspace");
         fs::create_dir(&root)?;
         let protected = root.join(".env");
-        let adapter =
-            FilesystemAdapter::new(vec![root.clone()], vec![protected.clone()])?;
+        let adapter = FilesystemAdapter::new(vec![root.clone()], vec![protected.clone()])?;
 
         let error = adapter
             .prepare_create(&root, "req", "lat_fs", Path::new(".env"), b"secret")
@@ -915,8 +941,7 @@ mod tests {
         fs::write(&outside, b"outside")?;
 
         let adapter = FilesystemAdapter::new(vec![root.clone()], Vec::new())?;
-        let request =
-            adapter.prepare_read(&root, "req-race", "lat_fs", Path::new("target.txt"))?;
+        let request = adapter.prepare_read(&root, "req-race", "lat_fs", Path::new("target.txt"))?;
         let permit = permit_for(&request, FsOperation::Read, &root);
 
         fs::remove_file(root.join("target.txt"))?;
@@ -927,7 +952,10 @@ mod tests {
             .execute(&permit, &mut ledger, 1_000_001)
             .expect_err("changed target must fail closed");
 
-        assert!(matches!(error, FsError::LeafSymlink(_) | FsError::PathChangedAfterAuthorization { .. }));
+        assert!(matches!(
+            error,
+            FsError::LeafSymlink(_) | FsError::PathChangedAfterAuthorization { .. }
+        ));
         Ok(())
     }
 
@@ -963,8 +991,8 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn symlinked_parent_escape_is_rejected(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn symlinked_parent_escape_is_rejected() -> std::result::Result<(), Box<dyn std::error::Error>>
+    {
         use std::os::unix::fs::symlink;
 
         let directory = tempdir()?;
@@ -993,5 +1021,4 @@ mod tests {
     fn create_file_symlink(target: &Path, link: &Path) -> std::io::Result<()> {
         std::os::unix::fs::symlink(target, link)
     }
-
 }

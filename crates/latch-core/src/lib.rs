@@ -88,7 +88,10 @@ impl std::fmt::Display for PermitError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::DecisionNotAllowed(effect) => {
-                write!(formatter, "cannot issue execution permit for {effect:?} decision")
+                write!(
+                    formatter,
+                    "cannot issue execution permit for {effect:?} decision"
+                )
             }
             Self::FingerprintMismatch { expected, actual } => write!(
                 formatter,
