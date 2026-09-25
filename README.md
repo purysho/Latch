@@ -8,7 +8,7 @@ Latch is a local-first security broker for AI agents. It sits between an agent a
 
 ## Status
 
-Latch is in active development. The current milestone establishes the security architecture, capability model, deterministic authorization core, negative-test matrix, and desktop shell before external execution adapters are enabled.
+Latch is in active development. Phases 0–2 now establish the security architecture, deterministic authorization core, negative-test matrix, persistent tamper-evident audit ledger, and desktop shell before external execution adapters are enabled.
 
 ## Principles
 
@@ -46,7 +46,10 @@ Deterministic policy evaluator
           adapter execution
                   |
                   v
-           audit ledger
+      SQLite audit ledger
+                  |
+                  v
+       SHA-256 hash chain
 ```
 
 No adapter may execute before an authorization decision exists.
@@ -56,18 +59,20 @@ No adapter may execute before an authorization decision exists.
 ```text
 crates/
   latch-core/       typed request, policy, resource and decision model
+  latch-audit/      immutable SQLite event ledger + hash-chain verification
 apps/
   desktop/          Tauri + React local control-plane UI
 docs/
   threat-model.md
   architecture.md
+  audit-ledger.md
   policy.md
   adr/
 ```
 
 ## Development
 
-The Rust core is intentionally independent of the UI and adapters.
+The Rust authorization and audit crates are independent of the UI and future execution adapters.
 
 ```bash
 cargo test --workspace
@@ -77,9 +82,9 @@ The desktop app follows the visual language of the Purysho desktop tools while u
 
 ## Roadmap
 
-1. Architecture + threat model
-2. Authorization core
-3. Audit ledger
+1. Architecture + threat model — complete
+2. Authorization core — complete
+3. Audit ledger — complete
 4. Filesystem adapter
 5. Controlled shell
 6. Approval system

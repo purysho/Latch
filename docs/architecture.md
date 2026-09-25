@@ -17,9 +17,11 @@ The system is split so the evaluator can be tested without a shell, network conn
    - `REQUIRE_APPROVAL`
 5. A decision includes a stable explanation and matched rule ID.
 6. For approval-required requests, the canonical request is fingerprinted.
-7. Only an exact, live approval grant can satisfy that request.
-8. Only then may an adapter receive execution authority.
-9. Decision and execution events are written to the audit ledger.
+7. Request receipt and the resulting authorization decision are appended atomically to the SQLite audit ledger.
+8. The audit ledger chains every entry to the previous SHA-256 hash and can verify historical integrity.
+9. Only an exact, live approval grant can satisfy an approval-required request.
+10. Only then may an adapter receive execution authority.
+11. Execution results will be appended to the same ledger once adapters are introduced.
 
 ## Crate boundaries
 
@@ -37,9 +39,18 @@ Pure authorization logic:
 
 It performs no external side effects.
 
-### future latch-audit
+### latch-audit
 
-SQLite persistence and hash-chained audit events.
+Local audit persistence:
+- immutable SQLite event rows
+- request IDs and authorization-decision records
+- atomic request + decision recording
+- SHA-256 hash chaining
+- chain verification
+- argument digests rather than raw request arguments
+- update/delete prevention at the SQLite schema boundary
+
+It does not execute tools or decide policy.
 
 ### future latch-adapters
 
@@ -74,6 +85,12 @@ J. Audit history alteration is detectable.
 ## Concurrency rule
 
 Authorization and execution must carry an immutable request ID and canonical fingerprint. A later mutation is a new request and requires a new decision.
+
+Audit appends use an immediate SQLite transaction so chain position and insertion occur under one writer lock.
+
+## Audit integrity boundary
+
+The V1 hash chain detects mutation, insertion, deletion from the middle, reordering, and broken linkage when the stored chain is verified. Like an unsigned local hash chain generally, it cannot independently prove that an attacker with unrestricted database replacement access did not replace the entire database or truncate and replace the trusted chain head. A future signed/exported checkpoint can anchor the head outside the database if that threat enters scope.
 
 ## UI rule
 
