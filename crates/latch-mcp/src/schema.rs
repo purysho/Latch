@@ -226,6 +226,7 @@ mod tests {
             input_schema: schema,
             output_schema: None,
             annotations: None,
+            extra: Default::default(),
         }
     }
 
