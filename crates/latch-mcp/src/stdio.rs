@@ -1,7 +1,5 @@
 use crate::model::{ProviderIdentityError, MCP_PROTOCOL_REVISION};
-use crate::{
-    DiscoverySnapshot, McpUpstream, ProviderIdentity, ToolDescriptor, UpstreamError,
-};
+use crate::{DiscoverySnapshot, McpUpstream, ProviderIdentity, ToolDescriptor, UpstreamError};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
