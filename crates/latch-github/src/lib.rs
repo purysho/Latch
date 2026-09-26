@@ -2,7 +2,9 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use latch_approvals::{ExecutionPermit, PermitSource};
 use latch_audit::{AuditEntryInput, AuditError, AuditEventType, AuditLedger};
 use latch_core::{ActionRequest, Resource};
-use latch_secrets::{SecretBroker, SecretError, OPERATION as SECRET_OPERATION, RESOURCE_KIND as SECRET_RESOURCE_KIND};
+use latch_secrets::{
+    SecretBroker, SecretError, OPERATION as SECRET_OPERATION, RESOURCE_KIND as SECRET_RESOURCE_KIND,
+};
 use reqwest::{blocking::Client, Method, Url};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -218,8 +220,9 @@ impl GithubRestTransport {
                 "GitHub user agent must not be empty".into(),
             ));
         }
-        let mut base_url = Url::parse(base_url)
-            .map_err(|error| GithubError::InvalidRequest(format!("invalid GitHub base URL: {error}")))?;
+        let mut base_url = Url::parse(base_url).map_err(|error| {
+            GithubError::InvalidRequest(format!("invalid GitHub base URL: {error}"))
+        })?;
         if !base_url.path().ends_with('/') {
             base_url.set_path(&format!("{}/", base_url.path()));
         }
@@ -230,7 +233,11 @@ impl GithubRestTransport {
         Ok(Self { client, base_url })
     }
 
-    fn endpoint(&self, repository: &str, extra_segments: &[&str]) -> std::result::Result<Url, String> {
+    fn endpoint(
+        &self,
+        repository: &str,
+        extra_segments: &[&str],
+    ) -> std::result::Result<Url, String> {
         let (owner, name) = split_repository(repository).map_err(|error| error.to_string())?;
         let mut url = self.base_url.clone();
         {
@@ -592,12 +599,10 @@ impl<T: GithubTransport> GithubAdapter<T> {
             }),
         })?;
 
-        let transport_result = secrets.execute_with(
-            secret_permit,
-            ledger,
-            now_unix_ms,
-            |token| self.transport.execute(&call, token),
-        )?;
+        let transport_result =
+            secrets.execute_with(secret_permit, ledger, now_unix_ms, |token| {
+                self.transport.execute(&call, token)
+            })?;
         let result = transport_result.map_err(GithubError::Transport)?;
         let result_bytes = serde_json::to_vec(&result)
             .map_err(|error| GithubError::Transport(error.to_string()))?;
@@ -708,10 +713,8 @@ fn request_from_call(
 }
 
 fn call_from_request(request: &ActionRequest) -> Result<GithubCall> {
-    let repository = || {
-        text_argument(&request.arguments, "repository")
-            .and_then(validated_repository)
-    };
+    let repository =
+        || text_argument(&request.arguments, "repository").and_then(validated_repository);
     match request.operation.as_str() {
         READ_FILE => Ok(GithubCall::ReadFile {
             repository: repository()?,
@@ -891,7 +894,9 @@ fn validated_branch(branch: &str) -> Result<String> {
         || branch.contains("@{")
         || branch.chars().any(char::is_control)
     {
-        return Err(GithubError::InvalidRequest("invalid Git branch name".into()));
+        return Err(GithubError::InvalidRequest(
+            "invalid Git branch name".into(),
+        ));
     }
     Ok(branch.into())
 }
@@ -1013,7 +1018,11 @@ mod tests {
         .unwrap()
     }
 
-    fn permit(request: &ActionRequest, effect: Effect, ledger: &mut AuditLedger) -> ExecutionPermit {
+    fn permit(
+        request: &ActionRequest,
+        effect: Effect,
+        ledger: &mut AuditLedger,
+    ) -> ExecutionPermit {
         let policy = Policy {
             version: 1,
             rules: vec![Rule {
@@ -1063,7 +1072,13 @@ mod tests {
         let broker = secrets();
         let mut adapter = GithubAdapter::new(MockTransport::default());
         let request = adapter
-            .prepare_read_file("req_read", "lat_github", "purysho/Latch", "README.md", "main")
+            .prepare_read_file(
+                "req_read",
+                "lat_github",
+                "purysho/Latch",
+                "README.md",
+                "main",
+            )
             .unwrap();
         let mut ledger = AuditLedger::in_memory().unwrap();
         let action = permit(&request, Effect::Allow, &mut ledger);
