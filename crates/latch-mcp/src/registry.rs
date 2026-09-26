@@ -634,6 +634,7 @@ mod tests {
             }),
             output_schema: None,
             annotations: None,
+            extra: Default::default(),
         }
     }
 
