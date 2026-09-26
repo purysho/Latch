@@ -205,19 +205,12 @@ mod tests {
 
     #[test]
     fn unsafe_provider_identifiers_are_rejected() {
-        assert!(ProviderIdentity::new(
-            "trusted/files",
-            "stdio",
-            "/trusted/server",
-            &json!({})
-        )
-        .is_err());
-        assert!(ProviderIdentity::new(
-            "trusted-files",
-            "std\nio",
-            "/trusted/server",
-            &json!({})
-        )
-        .is_err());
+        assert!(
+            ProviderIdentity::new("trusted/files", "stdio", "/trusted/server", &json!({})).is_err()
+        );
+        assert!(
+            ProviderIdentity::new("trusted-files", "std\nio", "/trusted/server", &json!({}))
+                .is_err()
+        );
     }
 }
