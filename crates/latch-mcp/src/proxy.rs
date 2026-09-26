@@ -173,9 +173,11 @@ impl<U: McpUpstream> McpProxy<U> {
                 tool_name,
                 expected_identity,
                 now_unix_ms,
-                "RESULT_TOO_LARGE",
-                result_bytes.len(),
-                &sha256_bytes(&result_bytes),
+                ResultAudit {
+                    outcome: "RESULT_TOO_LARGE",
+                    bytes: result_bytes.len(),
+                    sha256: &sha256_bytes(&result_bytes),
+                },
             ))?;
             return Err(ProxyError::ResultTooLarge(result_bytes.len()));
         }
@@ -191,9 +193,11 @@ impl<U: McpUpstream> McpProxy<U> {
                     tool_name,
                     expected_identity,
                     now_unix_ms,
-                    "INVALID_OUTPUT_SCHEMA",
-                    result_bytes.len(),
-                    &sha256_bytes(&result_bytes),
+                    ResultAudit {
+                        outcome: "INVALID_OUTPUT_SCHEMA",
+                        bytes: result_bytes.len(),
+                        sha256: &sha256_bytes(&result_bytes),
+                    },
                 ))?;
                 return Err(ProxyError::Schema(error));
             }
@@ -205,9 +209,11 @@ impl<U: McpUpstream> McpProxy<U> {
             tool_name,
             expected_identity,
             now_unix_ms,
-            "COMPLETED",
-            result_bytes.len(),
-            &sha256_bytes(&result_bytes),
+            ResultAudit {
+                outcome: "COMPLETED",
+                bytes: result_bytes.len(),
+                sha256: &sha256_bytes(&result_bytes),
+            },
         ))?;
 
         Ok(result)
@@ -270,15 +276,19 @@ fn forwarded_event(
     }
 }
 
+struct ResultAudit<'a> {
+    outcome: &'a str,
+    bytes: usize,
+    sha256: &'a str,
+}
+
 fn result_event(
     permit: &ExecutionPermit,
     provider: &ProviderIdentity,
     tool_name: &str,
     identity_fingerprint: &str,
     timestamp_unix_ms: i64,
-    outcome: &str,
-    result_bytes: usize,
-    result_sha256: &str,
+    result: ResultAudit<'_>,
 ) -> AuditEntryInput {
     let request = permit.request();
     AuditEntryInput {
@@ -291,7 +301,7 @@ fn result_event(
         resource_value: Some(request.resource.value.clone()),
         decision: Some(Effect::Allow),
         policy_rule: permit.rule_id().map(str::to_string),
-        reason: Some(outcome.to_string()),
+        reason: Some(result.outcome.to_string()),
         credential_ref: None,
         metadata: json!({
             "adapter": "mcp",
@@ -299,9 +309,9 @@ fn result_event(
             "provider_fingerprint": provider.provider_fingerprint(),
             "tool_name": tool_name,
             "tool_identity_fingerprint": identity_fingerprint,
-            "outcome": outcome,
-            "result_bytes": result_bytes,
-            "result_sha256": result_sha256,
+            "outcome": result.outcome,
+            "result_bytes": result.bytes,
+            "result_sha256": result.sha256,
         }),
     }
 }
@@ -458,7 +468,8 @@ mod tests {
         now_unix_ms: i64,
     ) -> ExecutionPermit {
         let policy = allow_policy(&request.resource.value);
-        let decision = evaluate(session, &policy, request, now_unix_ms / 1_000);
+        let now_unix = u64::try_from(now_unix_ms / 1_000).expect("non-negative test time");
+        let decision = evaluate(session, &policy, request, now_unix);
         let mut approvals = ApprovalStore::in_memory().expect("approval store");
         approvals
             .authorize(session, request, &decision, now_unix_ms)
