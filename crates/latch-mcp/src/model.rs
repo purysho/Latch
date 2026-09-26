@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
+use std::collections::BTreeMap;
 use sha2::{Digest, Sha256};
 use std::fmt;
 
@@ -28,6 +29,8 @@ pub struct ToolDescriptor {
     pub output_schema: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Value>,
+    #[serde(flatten, default)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -57,11 +60,12 @@ impl ProviderIdentity {
         let transport_kind = transport_kind.into();
         let endpoint = endpoint.into();
 
-        validate_component("provider_id", &provider_id)?;
-        validate_component("transport_kind", &transport_kind)?;
-        validate_component("endpoint", &endpoint)?;
+        validate_identifier("provider_id", &provider_id)?;
+        validate_identifier("transport_kind", &transport_kind)?;
+        validate_endpoint(&endpoint)?;
 
-        let binding = serde_json::to_vec(trusted_binding)
+        let canonical_binding = canonicalize_json(trusted_binding);
+        let binding = serde_json::to_vec(&canonical_binding)
             .map_err(|error| ProviderIdentityError::Binding(error.to_string()))?;
         let mut hasher = Sha256::new();
         hasher.update(b"latch-mcp-provider-v1");
@@ -98,17 +102,48 @@ impl ProviderIdentity {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProviderIdentityError {
-    #[error("{field} cannot be empty or contain control characters")]
-    InvalidComponent { field: &'static str },
+    #[error("{field} must be 1-128 ASCII letters, digits, dot, dash, or underscore")]
+    InvalidIdentifier { field: &'static str },
+    #[error("endpoint cannot be empty or contain control characters")]
+    InvalidEndpoint,
     #[error("failed to canonicalize trusted provider binding: {0}")]
     Binding(String),
 }
 
-fn validate_component(field: &'static str, value: &str) -> Result<(), ProviderIdentityError> {
-    if value.trim().is_empty() || value.chars().any(char::is_control) {
-        Err(ProviderIdentityError::InvalidComponent { field })
+fn validate_identifier(field: &'static str, value: &str) -> Result<(), ProviderIdentityError> {
+    if value.is_empty()
+        || value.len() > 128
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
+    {
+        Err(ProviderIdentityError::InvalidIdentifier { field })
     } else {
         Ok(())
+    }
+}
+
+fn validate_endpoint(value: &str) -> Result<(), ProviderIdentityError> {
+    if value.trim().is_empty() || value.chars().any(char::is_control) {
+        Err(ProviderIdentityError::InvalidEndpoint)
+    } else {
+        Ok(())
+    }
+}
+
+fn canonicalize_json(value: &Value) -> Value {
+    match value {
+        Value::Object(object) => {
+            let mut keys = object.keys().collect::<Vec<_>>();
+            keys.sort();
+            let mut canonical = Map::new();
+            for key in keys {
+                canonical.insert(key.clone(), canonicalize_json(&object[key]));
+            }
+            Value::Object(canonical)
+        }
+        Value::Array(values) => Value::Array(values.iter().map(canonicalize_json).collect()),
+        _ => value.clone(),
     }
 }
 
@@ -141,4 +176,51 @@ impl std::error::Error for UpstreamError {}
 pub trait McpUpstream {
     fn discover(&mut self) -> Result<DiscoverySnapshot, UpstreamError>;
     fn call_tool(&mut self, tool_name: &str, arguments: &Value) -> Result<Value, UpstreamError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn provider_fingerprint_is_independent_of_binding_key_order() {
+        let first = ProviderIdentity::new(
+            "files",
+            "stdio",
+            "/trusted/server",
+            &json!({"b":2,"a":{"z":1,"y":0}}),
+        )
+        .expect("provider");
+        let second = ProviderIdentity::new(
+            "files",
+            "stdio",
+            "/trusted/server",
+            &json!({"a":{"y":0,"z":1},"b":2}),
+        )
+        .expect("provider");
+
+        assert_eq!(
+            first.provider_fingerprint(),
+            second.provider_fingerprint()
+        );
+    }
+
+    #[test]
+    fn unsafe_provider_identifiers_are_rejected() {
+        assert!(ProviderIdentity::new(
+            "trusted/files",
+            "stdio",
+            "/trusted/server",
+            &json!({})
+        )
+        .is_err());
+        assert!(ProviderIdentity::new(
+            "trusted-files",
+            "std\nio",
+            "/trusted/server",
+            &json!({})
+        )
+        .is_err());
+    }
 }
