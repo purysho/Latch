@@ -64,14 +64,12 @@ mod tests {
     }
 
     fn secret_broker() -> SecretBroker {
-        SecretBroker::new([
-            SecretRegistration::new(
-                "github_main",
-                b"test-token".to_vec(),
-                [GITHUB_SECRET_CONSUMER],
-            )
-            .expect("secret registration"),
-        ])
+        SecretBroker::new([SecretRegistration::new(
+            "github_main",
+            b"test-token".to_vec(),
+            [GITHUB_SECRET_CONSUMER],
+        )
+        .expect("secret registration")])
         .expect("secret broker")
     }
 
