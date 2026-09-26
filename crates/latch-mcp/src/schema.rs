@@ -89,14 +89,8 @@ pub fn schema_fingerprint(tool: &ToolDescriptor) -> Result<String, SchemaError> 
 }
 
 pub fn descriptor_fingerprint(tool: &ToolDescriptor) -> Result<String, SchemaError> {
-    let value = serde_json::json!({
-        "name": tool.name,
-        "title": tool.title,
-        "description": tool.description,
-        "inputSchema": tool.input_schema,
-        "outputSchema": tool.output_schema,
-        "annotations": tool.annotations,
-    });
+    let value = serde_json::to_value(tool)
+        .map_err(|error| SchemaError::Serialization(error.to_string()))?;
     fingerprint_value(b"latch-mcp-descriptor-v1", &value)
 }
 
