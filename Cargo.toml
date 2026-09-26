@@ -8,6 +8,7 @@ members = [
   "crates/latch-mcp",
   "crates/latch-secrets",
   "crates/latch-github",
+  "crates/latch-adversarial",
 ]
 resolver = "2"
 

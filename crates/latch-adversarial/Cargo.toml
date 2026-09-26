@@ -1,0 +1,14 @@
+[package]
+name = "latch-adversarial"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+latch-approvals = { path = "../latch-approvals" }
+latch-audit = { path = "../latch-audit" }
+latch-core = { path = "../latch-core" }
+latch-github = { path = "../latch-github" }
+latch-secrets = { path = "../latch-secrets" }
+serde_json = "1"
