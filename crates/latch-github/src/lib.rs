@@ -20,6 +20,31 @@ pub const MERGE_PULL: &str = "github.pull.merge";
 pub const GITHUB_SECRET_CONSUMER: &str = "github-api";
 pub const MAX_CONTENT_BYTES: usize = 4 * 1024 * 1024;
 
+pub struct WriteFileInput<'a> {
+    pub repository: &'a str,
+    pub path: &'a str,
+    pub branch: &'a str,
+    pub message: &'a str,
+    pub content: &'a str,
+    pub existing_sha: Option<&'a str>,
+}
+
+pub struct DeleteFileInput<'a> {
+    pub repository: &'a str,
+    pub path: &'a str,
+    pub branch: &'a str,
+    pub message: &'a str,
+    pub sha: &'a str,
+}
+
+pub struct PullRequestInput<'a> {
+    pub repository: &'a str,
+    pub title: &'a str,
+    pub body: &'a str,
+    pub head: &'a str,
+    pub base: &'a str,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GithubCall {
     ReadFile {
@@ -70,17 +95,6 @@ impl GithubCall {
             Self::CreateBranch { .. } => CREATE_BRANCH,
             Self::CreatePullRequest { .. } => CREATE_PULL,
             Self::MergePullRequest { .. } => MERGE_PULL,
-        }
-    }
-
-    fn repository(&self) -> &str {
-        match self {
-            Self::ReadFile { repository, .. }
-            | Self::WriteFile { repository, .. }
-            | Self::DeleteFile { repository, .. }
-            | Self::CreateBranch { repository, .. }
-            | Self::CreatePullRequest { repository, .. }
-            | Self::MergePullRequest { repository, .. } => repository,
         }
     }
 
@@ -425,26 +439,21 @@ impl<T: GithubTransport> GithubAdapter<T> {
         &self,
         request_id: impl Into<String>,
         session_id: impl Into<String>,
-        repository: &str,
-        path: &str,
-        branch: &str,
-        message: &str,
-        content: &str,
-        existing_sha: Option<&str>,
+        input: WriteFileInput<'_>,
     ) -> Result<ActionRequest> {
-        if content.len() > MAX_CONTENT_BYTES {
+        if input.content.len() > MAX_CONTENT_BYTES {
             return Err(GithubError::InvalidRequest(format!(
                 "GitHub content exceeds {MAX_CONTENT_BYTES} bytes"
             )));
         }
-        validate_message(message)?;
+        validate_message(input.message)?;
         let call = GithubCall::WriteFile {
-            repository: validated_repository(repository)?,
-            path: validated_path(path)?,
-            branch: validated_branch(branch)?,
-            message: message.into(),
-            content: content.into(),
-            existing_sha: existing_sha.map(validated_blob_sha).transpose()?,
+            repository: validated_repository(input.repository)?,
+            path: validated_path(input.path)?,
+            branch: validated_branch(input.branch)?,
+            message: input.message.into(),
+            content: input.content.into(),
+            existing_sha: input.existing_sha.map(validated_blob_sha).transpose()?,
         };
         Ok(request_from_call(request_id, session_id, call))
     }
@@ -453,19 +462,15 @@ impl<T: GithubTransport> GithubAdapter<T> {
         &self,
         request_id: impl Into<String>,
         session_id: impl Into<String>,
-        repository: &str,
-        path: &str,
-        branch: &str,
-        message: &str,
-        sha: &str,
+        input: DeleteFileInput<'_>,
     ) -> Result<ActionRequest> {
-        validate_message(message)?;
+        validate_message(input.message)?;
         let call = GithubCall::DeleteFile {
-            repository: validated_repository(repository)?,
-            path: validated_path(path)?,
-            branch: validated_branch(branch)?,
-            message: message.into(),
-            sha: validated_blob_sha(sha)?,
+            repository: validated_repository(input.repository)?,
+            path: validated_path(input.path)?,
+            branch: validated_branch(input.branch)?,
+            message: input.message.into(),
+            sha: validated_blob_sha(input.sha)?,
         };
         Ok(request_from_call(request_id, session_id, call))
     }
@@ -490,28 +495,24 @@ impl<T: GithubTransport> GithubAdapter<T> {
         &self,
         request_id: impl Into<String>,
         session_id: impl Into<String>,
-        repository: &str,
-        title: &str,
-        body: &str,
-        head: &str,
-        base: &str,
+        input: PullRequestInput<'_>,
     ) -> Result<ActionRequest> {
-        if title.trim().is_empty() || title.len() > 256 {
+        if input.title.trim().is_empty() || input.title.len() > 256 {
             return Err(GithubError::InvalidRequest(
                 "pull request title must be 1-256 bytes".into(),
             ));
         }
-        if body.len() > 65_536 {
+        if input.body.len() > 65_536 {
             return Err(GithubError::InvalidRequest(
                 "pull request body exceeds 65536 bytes".into(),
             ));
         }
         let call = GithubCall::CreatePullRequest {
-            repository: validated_repository(repository)?,
-            title: title.into(),
-            body: body.into(),
-            head: validated_branch(head)?,
-            base: validated_branch(base)?,
+            repository: validated_repository(input.repository)?,
+            title: input.title.into(),
+            body: input.body.into(),
+            head: validated_branch(input.head)?,
+            base: validated_branch(input.base)?,
         };
         Ok(request_from_call(request_id, session_id, call))
     }
@@ -1099,12 +1100,14 @@ mod tests {
             .prepare_write_file(
                 "req_write",
                 "lat_github",
-                "purysho/Latch",
-                "README.md",
-                "main",
-                "Update README",
-                "new content",
-                Some("0123456789abcdef0123456789abcdef01234567"),
+                WriteFileInput {
+                    repository: "purysho/Latch",
+                    path: "README.md",
+                    branch: "main",
+                    message: "Update README",
+                    content: "new content",
+                    existing_sha: Some("0123456789abcdef0123456789abcdef01234567"),
+                },
             )
             .unwrap();
         let mut ledger = AuditLedger::in_memory().unwrap();
