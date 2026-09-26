@@ -19,7 +19,9 @@
       "transparent": false,
       "decorations": true
     }],
-    "security": { "csp": null }
+    "security": {
+      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' data: asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+    }
   },
   "bundle": { "active": true, "targets": "all" }
 }
