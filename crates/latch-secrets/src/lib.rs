@@ -432,7 +432,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(length, 18);
-        assert!(ledger.verify_chain().unwrap().valid);
+        assert!(ledger.verify().unwrap().valid);
     }
 
     #[test]

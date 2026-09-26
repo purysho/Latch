@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+hex = "0.4"
 latch-audit = { path = "../latch-audit" }
 latch-approvals = { path = "../latch-approvals" }
 latch-core = { path = "../latch-core" }
