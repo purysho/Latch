@@ -462,7 +462,6 @@ mod tests {
     }
 
     fn permit_for(
-        proxy: &McpProxy<MockUpstream>,
         session: &Session,
         request: &ActionRequest,
         now_unix_ms: i64,
@@ -603,7 +602,7 @@ mod tests {
             "read_file",
             json!({"path":"README.md"}),
         )?;
-        let permit = permit_for(&proxy, &session, &request, 1_200);
+        let permit = permit_for(&session, &request, 1_200);
 
         assert!(matches!(
             proxy.execute(permit, &mut ledger, 1_300),
@@ -661,7 +660,7 @@ mod tests {
             "read_file",
             json!({"path":"README.md"}),
         )?;
-        let permit = permit_for(&proxy, &session, &request, 1_200);
+        let permit = permit_for(&session, &request, 1_200);
 
         assert!(matches!(
             proxy.execute(permit, &mut ledger, 1_300),
