@@ -20,14 +20,6 @@ pub enum ToolState {
 }
 
 impl ToolState {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Active => "ACTIVE",
-            Self::Changed => "CHANGED",
-            Self::Missing => "MISSING",
-        }
-    }
-
     fn from_str(value: &str) -> Option<Self> {
         match value {
             "ACTIVE" => Some(Self::Active),
