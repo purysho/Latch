@@ -20,7 +20,11 @@ pub struct ToolDescriptor {
     pub description: Option<String>,
     #[serde(rename = "inputSchema")]
     pub input_schema: Value,
-    #[serde(rename = "outputSchema", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "outputSchema",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub output_schema: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annotations: Option<Value>,

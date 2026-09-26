@@ -33,8 +33,8 @@ pub enum SchemaError {
 pub fn validate_tool_descriptor(tool: &ToolDescriptor) -> Result<(), SchemaError> {
     validate_tool_name(&tool.name)?;
 
-    let bytes = serde_json::to_vec(tool)
-        .map_err(|error| SchemaError::Serialization(error.to_string()))?;
+    let bytes =
+        serde_json::to_vec(tool).map_err(|error| SchemaError::Serialization(error.to_string()))?;
     if bytes.len() > MAX_SCHEMA_BYTES {
         return Err(SchemaError::DescriptorTooLarge);
     }

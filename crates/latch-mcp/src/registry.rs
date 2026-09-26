@@ -625,13 +625,8 @@ mod tests {
     use serde_json::json;
 
     fn provider(id: &str, binding: &str) -> ProviderIdentity {
-        ProviderIdentity::new(
-            id,
-            "test",
-            "in-memory",
-            &json!({"binding": binding}),
-        )
-        .expect("provider")
+        ProviderIdentity::new(id, "test", "in-memory", &json!({"binding": binding}))
+            .expect("provider")
     }
 
     fn tool(name: &str, path_type: &str) -> ToolDescriptor {
@@ -707,10 +702,8 @@ mod tests {
             Err(RegistryError::ToolChanged(_))
         ));
 
-        let changed = registry
-            .connection
-            .query_row(
-                "
+        let changed = registry.connection.query_row(
+            "
                 SELECT provider_id, tool_name, state,
                        trusted_schema_fingerprint, trusted_descriptor_fingerprint,
                        trusted_identity_fingerprint, observed_schema_fingerprint,
@@ -720,9 +713,9 @@ mod tests {
                 FROM mcp_tools
                 WHERE provider_id = ?1 AND tool_name = 'read_file'
                 ",
-                [provider.provider_id()],
-                tool_from_row,
-            )?;
+            [provider.provider_id()],
+            tool_from_row,
+        )?;
 
         registry.accept_observed_change(
             &provider,
@@ -746,8 +739,8 @@ mod tests {
     }
 
     #[test]
-    fn provider_binding_change_is_rejected(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn provider_binding_change_is_rejected() -> std::result::Result<(), Box<dyn std::error::Error>>
+    {
         let original = provider("trusted-files", "one");
         let changed = provider("trusted-files", "different");
         let mut registry = ToolRegistry::in_memory()?;

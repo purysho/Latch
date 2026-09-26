@@ -1,8 +1,8 @@
 use crate::model::{McpUpstream, ProviderIdentity};
 use crate::registry::{DiscoveryReport, RegistryError, ToolRegistry};
 use crate::schema::{validate_arguments, validate_output, SchemaError};
-use latch_audit::{AuditEntryInput, AuditError, AuditEventType, AuditLedger};
 use latch_approvals::{ExecutionPermit, PermitSource};
+use latch_audit::{AuditEntryInput, AuditError, AuditEventType, AuditLedger};
 use latch_core::{ActionRequest, Effect, Resource};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -392,13 +392,8 @@ mod tests {
     }
 
     fn provider(id: &str, binding: &str) -> ProviderIdentity {
-        ProviderIdentity::new(
-            id,
-            "test",
-            "in-memory",
-            &json!({"binding":binding}),
-        )
-        .expect("provider")
+        ProviderIdentity::new(id, "test", "in-memory", &json!({"binding":binding}))
+            .expect("provider")
     }
 
     fn descriptor(path_type: &str) -> ToolDescriptor {
@@ -475,7 +470,10 @@ mod tests {
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         let provider = provider("trusted-files", "one");
         let upstream = MockUpstream::new(
-            vec![snapshot(descriptor("string")), snapshot(descriptor("string"))],
+            vec![
+                snapshot(descriptor("string")),
+                snapshot(descriptor("string")),
+            ],
             json!({
                 "content":[{"type":"text","text":"hello"}],
                 "structuredContent":{"text":"hello"}
@@ -506,7 +504,9 @@ mod tests {
         assert_eq!(result["structuredContent"]["text"], "hello");
         assert_eq!(proxy.upstream().calls, 1);
         let events = ledger.entries()?;
-        assert!(events.iter().any(|entry| entry.event_type == "TOOL_FORWARDED"));
+        assert!(events
+            .iter()
+            .any(|entry| entry.event_type == "TOOL_FORWARDED"));
         assert!(events.iter().any(|entry| entry.event_type == "TOOL_RESULT"));
         Ok(())
     }
@@ -517,14 +517,8 @@ mod tests {
         let trusted_provider = provider("trusted-files", "trusted-binding");
         let malicious_provider = provider("malicious-files", "malicious-binding");
 
-        let trusted_upstream = MockUpstream::new(
-            vec![snapshot(descriptor("string"))],
-            json!({}),
-        );
-        let malicious_upstream = MockUpstream::new(
-            vec![snapshot(descriptor("string"))],
-            json!({}),
-        );
+        let trusted_upstream = MockUpstream::new(vec![snapshot(descriptor("string"))], json!({}));
+        let malicious_upstream = MockUpstream::new(vec![snapshot(descriptor("string"))], json!({}));
 
         let mut trusted = McpProxy::new(
             trusted_provider,
@@ -578,7 +572,10 @@ mod tests {
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         let provider = provider("trusted-files", "one");
         let upstream = MockUpstream::new(
-            vec![snapshot(descriptor("string")), snapshot(descriptor("integer"))],
+            vec![
+                snapshot(descriptor("string")),
+                snapshot(descriptor("integer")),
+            ],
             json!({
                 "structuredContent":{"text":"should not run"}
             }),
@@ -613,22 +610,14 @@ mod tests {
     fn invalid_arguments_never_reach_upstream(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         let provider = provider("trusted-files", "one");
-        let upstream = MockUpstream::new(
-            vec![snapshot(descriptor("string"))],
-            json!({}),
-        );
+        let upstream = MockUpstream::new(vec![snapshot(descriptor("string"))], json!({}));
         let registry = ToolRegistry::in_memory()?;
         let mut proxy = McpProxy::new(provider, registry, upstream, 1_000)?;
         let mut ledger = AuditLedger::in_memory()?;
         proxy.discover(&mut ledger, 1_100)?;
 
         assert!(matches!(
-            proxy.prepare_call(
-                "req_bad",
-                "lat_bad",
-                "read_file",
-                json!({"path":42})
-            ),
+            proxy.prepare_call("req_bad", "lat_bad", "read_file", json!({"path":42})),
             Err(ProxyError::Schema(_))
         ));
         assert_eq!(proxy.upstream().calls, 0);
@@ -640,7 +629,10 @@ mod tests {
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         let provider = provider("trusted-files", "one");
         let upstream = MockUpstream::new(
-            vec![snapshot(descriptor("string")), snapshot(descriptor("string"))],
+            vec![
+                snapshot(descriptor("string")),
+                snapshot(descriptor("string")),
+            ],
             json!({
                 "content":[{"type":"text","text":"bad"}],
                 "structuredContent":{"text":42}
