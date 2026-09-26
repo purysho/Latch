@@ -139,7 +139,11 @@ impl SecretBroker {
             .collect()
     }
 
-    pub fn rotate(&mut self, credential_ref: &str, new_material: impl Into<Vec<u8>>) -> Result<u64> {
+    pub fn rotate(
+        &mut self,
+        credential_ref: &str,
+        new_material: impl Into<Vec<u8>>,
+    ) -> Result<u64> {
         let mut new_material = new_material.into();
         if new_material.is_empty() {
             return Err(SecretError::InvalidRegistration(
@@ -435,7 +439,9 @@ mod tests {
     fn rotation_invalidates_stale_permit() {
         let mut broker = broker();
         let permit = permit_for(&broker, "req_3");
-        broker.rotate("github_main", b"replacement".to_vec()).unwrap();
+        broker
+            .rotate("github_main", b"replacement".to_vec())
+            .unwrap();
         let mut ledger = AuditLedger::in_memory().unwrap();
         assert!(matches!(
             broker.execute_with(permit, &mut ledger, 1_100, |_| ()),
