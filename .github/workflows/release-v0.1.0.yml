@@ -1,0 +1,71 @@
+name: Release v0.1.0
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Check whether release already exists
+        id: release_check
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view v0.1.0 --repo "$env:GITHUB_REPOSITORY" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            "exists=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "exists=false" >> $env:GITHUB_OUTPUT
+          }
+          exit 0
+
+      - uses: actions/setup-node@v4
+        if: steps.release_check.outputs.exists != 'true'
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.release_check.outputs.exists != 'true'
+
+      - name: Install desktop dependencies
+        if: steps.release_check.outputs.exists != 'true'
+        working-directory: apps/desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Build Windows NSIS installer
+        if: steps.release_check.outputs.exists != 'true'
+        working-directory: apps/desktop
+        run: npm run tauri build -- --bundles nsis
+
+      - name: Stage installer and checksum
+        if: steps.release_check.outputs.exists != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $installer = Get-ChildItem "apps/desktop/src-tauri/target/release/bundle/nsis" -Filter "*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "Tauri NSIS installer not found" }
+          $target = "dist/Latch_0.1.0_windows_x64-setup.exe"
+          Copy-Item $installer.FullName $target
+          $hash = (Get-FileHash $target -Algorithm SHA256).Hash.ToLower()
+          "$hash  Latch_0.1.0_windows_x64-setup.exe" | Set-Content -NoNewline "dist/SHA256SUMS.txt"
+
+      - name: Publish GitHub release
+        if: steps.release_check.outputs.exists != 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v0.1.0 "dist/Latch_0.1.0_windows_x64-setup.exe" "dist/SHA256SUMS.txt" --repo "$env:GITHUB_REPOSITORY" --target "${{ github.event.workflow_run.head_sha }}" --title "Latch v0.1.0" --notes-file "RELEASE_NOTES_v0.1.0.md"
