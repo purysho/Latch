@@ -461,11 +461,7 @@ mod tests {
         }
     }
 
-    fn permit_for(
-        session: &Session,
-        request: &ActionRequest,
-        now_unix_ms: i64,
-    ) -> ExecutionPermit {
+    fn permit_for(session: &Session, request: &ActionRequest, now_unix_ms: i64) -> ExecutionPermit {
         let policy = allow_policy(&request.resource.value);
         let now_unix = u64::try_from(now_unix_ms / 1_000).expect("non-negative test time");
         let decision = evaluate(session, &policy, request, now_unix);
