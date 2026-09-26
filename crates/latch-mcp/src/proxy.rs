@@ -424,6 +424,7 @@ mod tests {
                 "additionalProperties":false
             })),
             annotations: None,
+            extra: Default::default(),
         }
     }
 
