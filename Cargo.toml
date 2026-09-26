@@ -5,6 +5,7 @@ members = [
   "crates/latch-approvals",
   "crates/latch-fs",
   "crates/latch-shell",
+  "crates/latch-mcp",
 ]
 resolver = "2"
 
