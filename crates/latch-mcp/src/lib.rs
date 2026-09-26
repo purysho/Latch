@@ -2,6 +2,7 @@ mod model;
 mod proxy;
 mod registry;
 mod schema;
+mod stdio;
 
 pub use model::{
     DiscoverySnapshot, McpUpstream, ProviderIdentity, ReportedServerInfo, ToolDescriptor,
@@ -12,4 +13,9 @@ pub use registry::{DiscoveryReport, RegistryError, ToolRecord, ToolRegistry, Too
 pub use schema::{
     descriptor_fingerprint, schema_fingerprint, tool_identity_fingerprint, validate_arguments,
     validate_tool_descriptor, SchemaError,
+};
+
+pub use stdio::{
+    StdioError, StdioProviderConfig, StdioUpstream, DEFAULT_MAX_STDIO_MESSAGE_BYTES,
+    DEFAULT_STDIO_REQUEST_TIMEOUT,
 };
