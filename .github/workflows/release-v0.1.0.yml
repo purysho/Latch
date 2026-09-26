@@ -40,6 +40,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         if: steps.release_check.outputs.exists != 'true'
 
+      - uses: actions/setup-python@v5
+        if: steps.release_check.outputs.exists != 'true'
+        with:
+          python-version: "3.12"
+
+      - name: Generate Windows icon from source PNG
+        if: steps.release_check.outputs.exists != 'true'
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check pillow
+          python -c "from PIL import Image; im=Image.open(r'apps/desktop/src-tauri/icons/icon.png').convert('RGBA'); im.save(r'apps/desktop/src-tauri/icons/icon.ico', format='ICO', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128)])"
+
       - name: Install desktop dependencies
         if: steps.release_check.outputs.exists != 'true'
         working-directory: apps/desktop
