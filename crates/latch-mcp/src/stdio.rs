@@ -1,5 +1,8 @@
 use crate::model::{ProviderIdentityError, MCP_PROTOCOL_REVISION};
-use crate::{DiscoverySnapshot, McpUpstream, ProviderIdentity, ReportedServerInfo, ToolDescriptor, UpstreamError};
+use crate::{
+    DiscoverySnapshot, McpUpstream, ProviderIdentity, ReportedServerInfo, ToolDescriptor,
+    UpstreamError,
+};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -159,9 +162,7 @@ impl StdioProviderConfig {
 
     fn verify_identity_material(&self) -> Result<(), StdioError> {
         if sha256_file(&self.executable)? != self.executable_sha256 {
-            return Err(StdioError::IdentityMaterialChanged(
-                self.executable.clone(),
-            ));
+            return Err(StdioError::IdentityMaterialChanged(self.executable.clone()));
         }
 
         for (path, expected) in &self.identity_files {
@@ -288,8 +289,8 @@ impl StdioUpstream {
             "method": method,
             "params": params,
         });
-        let encoded = serde_json::to_vec(&message)
-            .map_err(|error| StdioError::Json(error.to_string()))?;
+        let encoded =
+            serde_json::to_vec(&message).map_err(|error| StdioError::Json(error.to_string()))?;
         if encoded.len() > self.config.max_message_bytes {
             return Err(StdioError::MessageTooLarge(encoded.len()));
         }
@@ -305,11 +306,7 @@ impl StdioUpstream {
                 .and_then(|_| process.stdin.write_all(b"\n"))
                 .and_then(|_| process.stdin.flush())
                 .map_err(|error| StdioError::Io("write MCP request", error))?;
-            receive_response(
-                &process.receiver,
-                request_id,
-                self.config.request_timeout,
-            )
+            receive_response(&process.receiver, request_id, self.config.request_timeout)
         };
 
         if result.is_err() {
@@ -390,11 +387,7 @@ impl StdioUpstream {
         Err(StdioError::TooManyDiscoveryPages)
     }
 
-    fn call_tool_inner(
-        &mut self,
-        tool_name: &str,
-        arguments: &Value,
-    ) -> Result<Value, StdioError> {
+    fn call_tool_inner(&mut self, tool_name: &str, arguments: &Value) -> Result<Value, StdioError> {
         let mut params = Map::new();
         params.insert("name".into(), Value::String(tool_name.to_string()));
         params.insert("arguments".into(), arguments.clone());
@@ -423,7 +416,8 @@ impl McpUpstream for StdioUpstream {
     }
 
     fn call_tool(&mut self, tool_name: &str, arguments: &Value) -> Result<Value, UpstreamError> {
-        self.call_tool_inner(tool_name, arguments).map_err(Into::into)
+        self.call_tool_inner(tool_name, arguments)
+            .map_err(Into::into)
     }
 }
 
@@ -671,10 +665,7 @@ mod tests {
     #[test]
     fn request_meta_pins_modern_protocol_and_no_extra_capabilities() {
         let metadata = request_meta();
-        assert_eq!(
-            metadata[PROTOCOL_VERSION_META_KEY],
-            MCP_PROTOCOL_REVISION
-        );
+        assert_eq!(metadata[PROTOCOL_VERSION_META_KEY], MCP_PROTOCOL_REVISION);
         assert_eq!(metadata[CLIENT_CAPABILITIES_META_KEY], json!({}));
         assert_eq!(metadata[CLIENT_INFO_META_KEY]["name"], "Latch");
     }

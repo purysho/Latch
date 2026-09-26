@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::collections::BTreeMap;
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::fmt;
 
 pub const MCP_PROTOCOL_REVISION: &str = "2026-07-28";
@@ -200,10 +200,7 @@ mod tests {
         )
         .expect("provider");
 
-        assert_eq!(
-            first.provider_fingerprint(),
-            second.provider_fingerprint()
-        );
+        assert_eq!(first.provider_fingerprint(), second.provider_fingerprint());
     }
 
     #[test]
